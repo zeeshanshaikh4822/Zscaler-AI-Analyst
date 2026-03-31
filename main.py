@@ -94,6 +94,14 @@ MENU = {
 }
 
 
+def prompt(msg: str) -> str | None:
+    """Read a line of input, returning None on EOF (non-interactive/piped use)."""
+    try:
+        return input(msg).strip()
+    except EOFError:
+        return None
+
+
 def print_banner():
     print("\n" + "═" * 60)
     print("  Zscaler Security Analyst — Powered by Claude")
@@ -137,7 +145,9 @@ def run_custom(zs: ZscalerClient, analyst: ZscalerAnalyst):
     for k, (name, _) in sources.items():
         print(f"  [{k}] {name}")
 
-    src_key = input("\nSelect data source: ").strip()
+    src_key = prompt("\nSelect data source: ")
+    if src_key is None:
+        return
     if src_key not in sources:
         print("  Invalid selection.")
         return
@@ -150,7 +160,7 @@ def run_custom(zs: ZscalerClient, analyst: ZscalerAnalyst):
         print(f"  [ERROR] Failed to fetch data ({type(e).__name__}). Check your credentials and network.")
         return
 
-    question = input("\nYour question: ").strip()
+    question = prompt("\nYour question: ")
     if not question:
         return
 
@@ -183,7 +193,11 @@ def main():
 
     while True:
         print_menu()
-        choice = input("Choice: ").strip().lower()
+        choice = prompt("Choice: ")
+        if choice is None:
+            print("  Bye.\n")
+            break
+        choice = choice.lower()
 
         if choice == "q":
             print("  Bye.\n")
@@ -216,7 +230,8 @@ def main():
         analysis = analyst.analyze(data, question)
         save_report(label, data, analysis)
 
-        input("\n  Press Enter to continue...")
+        if prompt("\n  Press Enter to continue...") is None:
+            break
 
 
 if __name__ == "__main__":
