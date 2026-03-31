@@ -88,13 +88,19 @@ MENU = {
             "1. Identify categories set to 'Allow' that should be blocked or monitored\n"
             "2. Find categories that bypass SSL inspection\n"
             "3. Check for policy conflicts or redundant rules\n"
-            "4. Recommend tightening for a zero trust posture"
+            "4. Recommend tightening for a zero trust posture\n"
+            "5. POLICY VIOLATION CHECK (flag as critical): Our security policy strictly requires that all URLs "
+            "in custom categories must be placed under 'URLs Retaining Parent Category' (dbCategorizedUrls / "
+            "urlsRetainingParentCategoryCount > 0). Any custom category that has URLs in the 'Custom URLs' "
+            "field (urls list / customUrlsCount > 0) is a policy violation. For each violating category, show "
+            "only the category name and the customUrlsCount — do not list the actual URLs. State that each "
+            "must have its URLs moved to 'URLs Retaining Parent Category'."
         ),
     },
 }
 
 
-def prompt(msg: str) -> str | None:
+def prompt(msg: str):
     """Read a line of input, returning None on EOF (non-interactive/piped use)."""
     try:
         return input(msg).strip()
