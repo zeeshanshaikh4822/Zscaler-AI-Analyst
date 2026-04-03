@@ -1,5 +1,12 @@
 # Zscaler Security Analyst — Powered by Claude
 
+> [!WARNING]
+> **Beta Software — Do Not Use in Production**
+>
+> This tool is under active development and has not been validated for production use. Run it only against a **non-production / lab Zscaler tenant** until a stable release is announced.
+>
+> **Always use a read-only API credential** (see [Zscaler API Setup](#zscaler-api-setup) below). This tool only performs GET requests and never modifies your configuration, but a scoped read-only key ensures that is enforced at the API level.
+
 A CLI tool that pulls live configuration data from your Zscaler tenant via OneAPI and sends it to Claude (Opus) for expert security analysis. Runs interactively in the terminal — no web server, no setup beyond credentials.
 
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Anthropic](https://img.shields.io/badge/Claude-Opus%204.6-purple) ![Zscaler](https://img.shields.io/badge/Zscaler-ZIA%20OneAPI-00A1E0)
@@ -56,6 +63,43 @@ The most detailed analysis. Produces two tables:
 | Bypass Financial | ✅ OK | Do Not Inspect — Financial (🟢 Enabled) | No action needed |
 
 **Global settings table** — tenant-wide SSL security settings with 🟢/🔴 status and bolded remediation if disabled.
+
+---
+
+## Zscaler API Setup
+
+This tool uses Zscaler's OneAPI OAuth2 (`client_credentials` flow). To keep your tenant safe, create a **dedicated read-only API client** before running anything.
+
+### Create a read-only API client in Zscaler
+
+1. Log in to the Zscaler Admin Portal
+2. Go to **Administration → API → API Key Management**
+3. Click **Add API Client**
+4. Fill in:
+   - **Name**: `claude-analyst-readonly` (or similar)
+   - **Role**: Select a role with **read-only** permissions — if no read-only role exists, create one (see below)
+5. Copy the **Client ID** and **Client Secret** — you won't see the secret again
+6. Click **Save**
+
+### Create a read-only admin role (if needed)
+
+1. Go to **Administration → Role Management → Add Role**
+2. Set **Role Name**: `API Read Only`
+3. Under **Permissions**, set everything to **View** — do not grant any Edit, Create, or Delete permissions
+4. Save the role, then assign it to your API client in step 4 above
+
+> [!NOTE]
+> Zscaler's API does not have a built-in "read-only" toggle per client — access is controlled by the **admin role** assigned to the client. A properly scoped View-only role prevents any write operations even if someone reuses the credentials.
+
+### What this tool reads (GET only)
+
+| Zscaler Product | Data accessed |
+|-----------------|--------------|
+| ZIA | Firewall rules, SSL inspection rules, URL categories, DLP dictionaries, shadow IT apps, threat protection config, IP destination groups |
+| ZPA | Application segments, access policies, connectors *(not yet in menu — available on client class)* |
+| ZDX | App list, scorecard *(not yet in menu)* |
+
+This tool makes **no POST, PUT, or DELETE requests**. All Zscaler calls are read-only GETs.
 
 ---
 
