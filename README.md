@@ -5,7 +5,7 @@
 >
 > This tool is under active development and has not been validated for production use. Run it only against a **non-production / lab Zscaler tenant** until a stable release is announced.
 >
-> **Always use a read-only API credential** (see [Zscaler API Setup](#zscaler-api-setup) below). This tool only performs GET requests and never modifies your configuration, but a scoped read-only key ensures that is enforced at the API level.
+> **Always use a read-only API credential** (see [Zscaler API Setup](#zscaler-api-setup)). This tool only performs GET requests and never modifies your configuration, but a scoped read-only key ensures that is enforced at the API level.
 
 A CLI tool that pulls live configuration data from your Zscaler tenant via OneAPI and sends it to Claude (Opus) for expert security analysis. Runs interactively in the terminal — no web server, no setup beyond credentials.
 
