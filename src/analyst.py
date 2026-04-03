@@ -2,6 +2,11 @@
 
 import json
 import anthropic
+from rich.console import Console
+from rich.live import Live
+from rich.markdown import Markdown
+
+console = Console()
 
 SYSTEM_PROMPT = """You are a senior network security analyst specializing in Zscaler Zero Trust architecture.
 
@@ -25,7 +30,7 @@ class ZscalerAnalyst:
         # Warn if payload is large
         tokens_estimate = len(payload) // 4
         if tokens_estimate > 50_000:
-            print(f"  [!] Large payload (~{tokens_estimate:,} est. tokens) — consider filtering first")
+            console.print(f"  [bold yellow][!][/] Large payload (~{tokens_estimate:,} est. tokens) — consider filtering first")
 
         messages = [{
             "role": "user",
@@ -36,7 +41,7 @@ class ZscalerAnalyst:
             return self._stream(messages)
         else:
             resp = self.client.messages.create(
-                model="claude-sonnet-4-6",
+                model="claude-opus-4-6",
                 max_tokens=4096,
                 system=SYSTEM_PROMPT,
                 messages=messages,
@@ -45,14 +50,14 @@ class ZscalerAnalyst:
 
     def _stream(self, messages: list) -> str:
         full_text = ""
-        with self.client.messages.stream(
-            model="claude-sonnet-4-6",
-            max_tokens=4096,
-            system=SYSTEM_PROMPT,
-            messages=messages,
-        ) as stream:
-            for text in stream.text_stream:
-                print(text, end="", flush=True)
-                full_text += text
-        print()  # newline after stream ends
+        with Live(console=console, refresh_per_second=10, vertical_overflow="visible") as live:
+            with self.client.messages.stream(
+                model="claude-opus-4-6",
+                max_tokens=4096,
+                system=SYSTEM_PROMPT,
+                messages=messages,
+            ) as stream:
+                for text in stream.text_stream:
+                    full_text += text
+                    live.update(Markdown(full_text))
         return full_text

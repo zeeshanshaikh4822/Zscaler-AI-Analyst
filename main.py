@@ -10,15 +10,21 @@ import json
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.rule import Rule
 
 load_dotenv()
+
+console = Console()
 
 # ── Validate env vars ──────────────────────────────────────────────────────
 REQUIRED = ["ANTHROPIC_API_KEY", "ZSCALER_CLIENT_ID", "ZSCALER_CLIENT_SECRET", "ZSCALER_CLOUD", "ZSCALER_VANITY_DOMAIN"]
 missing = [k for k in REQUIRED if not os.environ.get(k)]
 if missing:
-    print(f"[ERROR] Missing environment variables: {', '.join(missing)}")
-    print("Copy .env.example to .env and fill in your credentials.")
+    console.print(f"[bold red][ERROR][/] Missing environment variables: {', '.join(missing)}")
+    console.print("Copy .env.example to .env and fill in your credentials.")
     sys.exit(1)
 
 from src import ZscalerAuth, ZscalerClient, ZscalerAnalyst
@@ -97,6 +103,57 @@ MENU = {
             "must have its URLs moved to 'URLs Retaining Parent Category'."
         ),
     },
+    "7": {
+        "label": "SSL Inspection Security Report",
+        "fetcher": "get_ssl_inspection_full",
+        "question": (
+            "Audit these SSL inspection rules against Zscaler best practices. "
+            "Produce exactly two things — nothing else.\n\n"
+            "## SSL Inspection Rules\n\n"
+            "A markdown table with these four columns, one row per rule:\n\n"
+            "| Rule Name | Criticality | Current Config | Suggested Fix |\n"
+            "|-----------|-------------|----------------|---------------|\n\n"
+            "Column guidance:\n"
+            "- **Rule Name**: exact rule name from the data\n"
+            "- **Criticality**: CRITICAL / HIGH / MEDIUM / LOW / ✅ OK\n"
+            "- **Current Config**: translate API values — DECRYPT → Inspect, DO_NOT_DECRYPT → Do Not Inspect, BLOCK → Block. "
+            "Show state as 🟢 Enabled or 🔴 Disabled. "
+            "Also check and show inline for each rule: "
+            "Block SNI (🟢/🔴), OCSP Check (🟢/🔴), Block Undecryptable (🟢/🔴) if those fields exist on the rule. "
+            "Format: 'Inspect — All traffic (🟢 Enabled) | SNI 🔴 | OCSP 🔴 | Undecryptable 🔴'\n"
+            "- **Suggested Fix**: combine the policy flaw fix (if any) with any of these missing security checks. "
+            "Use these exact phrases when the check is missing/disabled:\n"
+            "  • Block SNI missing on a DECRYPT/Inspect rule: "
+            "'Enable Block SNI — traffic without SNI can bypass URL-based policies and hide C2 communications'\n"
+            "  • OCSP Revocation Check disabled: "
+            "'Enable OCSP check — without it, connections to sites with revoked certificates (compromised/phishing) are permitted'\n"
+            "  • Block Undecryptable Traffic disabled on an Inspect All or default rule: "
+            "'Enable Block Undecryptable Traffic — undecryptable traffic is a known exfiltration and C2 evasion technique'\n"
+            "  If multiple issues exist on one rule, list each on a new line within the cell. "
+            "If no issues, use 'No action needed'.\n\n"
+            "Criticality rules (escalate if any security check above is also missing):\n"
+            "- CRITICAL: Do Not Inspect on malware/botnets/phishing/anonymizers/newly registered domains, or ANY/ANY bypass\n"
+            "- HIGH: Do Not Inspect on cloud storage/file sharing/social media; broad category bypass; "
+            "Block SNI missing on an Inspect rule\n"
+            "- MEDIUM: 🔴 Disabled rule; rule ordering issue; OCSP or Block Undecryptable missing\n"
+            "- LOW: minor best-practice deviation\n"
+            "- ✅ OK: correctly configured with all security checks enabled\n\n"
+            "## Global SSL Settings\n\n"
+            "A second markdown table for tenant-wide SSL settings "
+            "(look for blockNoSni, ocspEnabled, blockUndecryptableTraffic or similar fields in the data):\n\n"
+            "| Setting | Status | Recommendation |\n"
+            "|---------|--------|----------------|\n"
+            "| Block No Server Name Indication (SNI) | 🟢 Enabled / 🔴 Disabled | ... |\n"
+            "| OCSP Revocation Check | 🟢 Enabled / 🔴 Disabled | ... |\n"
+            "| Block Undecryptable Traffic | 🟢 Enabled / 🔴 Disabled | ... |\n\n"
+            "Show 🟢 Enabled if true/present, 🔴 Disabled if false/missing. "
+            "If 🔴 Disabled, bold the recommendation. Use these exact recommendations:\n"
+            "- Block SNI disabled: **Enable on all Inspect rules — traffic without SNI can bypass URL-based policies and hide C2 communications**\n"
+            "- OCSP disabled: **Enable globally — without OCSP checks, connections to sites with revoked certificates (compromised/phishing) are permitted**\n"
+            "- Block Undecryptable disabled: **Enable on Inspect All and default rule — undecryptable traffic is a known exfiltration and C2 evasion technique**\n\n"
+            "End with one summary line: count of CRITICAL, HIGH, MEDIUM, LOW, and OK rules. Nothing else."
+        ),
+    },
 }
 
 
@@ -109,20 +166,25 @@ def prompt(msg: str):
 
 
 def print_banner():
-    print("\n" + "═" * 60)
-    print("  Zscaler Security Analyst — Powered by Claude")
-    print("═" * 60)
-    print(f"  Cloud: {os.environ['ZSCALER_CLOUD']}")
-    print(f"  Date:  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("═" * 60)
+    console.print(Panel.fit(
+        f"[bold cyan]Zscaler Security Analyst[/] — Powered by Claude\n"
+        f"[dim]Cloud:[/] {os.environ['ZSCALER_CLOUD']}   "
+        f"[dim]Date:[/] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        border_style="cyan",
+    ))
 
 
 def print_menu():
-    print("\nSelect an analysis:\n")
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column(style="bold cyan", width=5)
+    table.add_column()
     for key, item in MENU.items():
-        print(f"  [{key}] {item['label']}")
-    print("  [c] Custom question (with data source selection)")
-    print("  [q] Quit\n")
+        table.add_row(f"[{key}]", item["label"])
+    table.add_row("[c]", "Custom question (with data source selection)")
+    table.add_row("[q]", "Quit")
+    console.print("\n[bold]Select an analysis:[/]\n")
+    console.print(table)
+    console.print()
 
 
 def save_report(label: str, data, analysis: str):
@@ -136,7 +198,7 @@ def save_report(label: str, data, analysis: str):
         "raw_data": data,
         "claude_analysis": analysis,
     }, indent=2))
-    print(f"\n  [Saved] {path}")
+    console.print(f"\n  [bold green]✓ Saved[/] {path}")
 
 
 def run_custom(zs: ZscalerClient, analyst: ZscalerAnalyst):
@@ -144,33 +206,38 @@ def run_custom(zs: ZscalerClient, analyst: ZscalerAnalyst):
     sources = {str(i + 1): (name, getattr(zs, name)) for i, name in enumerate([
         "get_firewall_rules", "get_url_categories", "get_ssl_inspection_rules",
         "get_shadow_it_apps", "get_dlp_dictionaries", "get_threat_log_config",
-        "get_blocked_destinations",
+        "get_blocked_destinations", "get_ssl_inspection_full",
     ])}
 
-    print("\nAvailable data sources:")
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column(style="bold cyan", width=5)
+    table.add_column()
     for k, (name, _) in sources.items():
-        print(f"  [{k}] {name}")
+        table.add_row(f"[{k}]", name)
+    console.print("\n[bold]Available data sources:[/]\n")
+    console.print(table)
+    console.print()
 
-    src_key = prompt("\nSelect data source: ")
+    src_key = prompt("Select data source: ")
     if src_key is None:
         return
     if src_key not in sources:
-        print("  Invalid selection.")
+        console.print("  [bold red][ERROR][/] Invalid selection.")
         return
 
     name, fetcher = sources[src_key]
-    print(f"\n  Fetching {name}...")
     try:
-        data = fetcher()
+        with console.status(f"Fetching [cyan]{name}[/]..."):
+            data = fetcher()
     except Exception as e:
-        print(f"  [ERROR] Failed to fetch data ({type(e).__name__}). Check your credentials and network.")
+        console.print(f"  [bold red][ERROR][/] Failed to fetch data ({type(e).__name__}). Check your credentials and network.")
         return
 
     question = prompt("\nYour question: ")
     if not question:
         return
 
-    print("\n" + "─" * 60)
+    console.print(Rule(title="Claude Analysis", style="cyan"))
     analysis = analyst.analyze(data, question)
     save_report(name, data, analysis)
 
@@ -187,12 +254,12 @@ def main():
     analyst = ZscalerAnalyst(api_key=os.environ["ANTHROPIC_API_KEY"])
 
     # Test auth on startup
-    print("\n  Authenticating with Zscaler OneAPI...", end="", flush=True)
     try:
-        _ = auth.token
-        print(" OK")
+        with console.status("Authenticating with Zscaler OneAPI..."):
+            _ = auth.token
+        console.print("  [green]✓[/] Authenticated")
     except Exception as e:
-        print(f"\n  [ERROR] Authentication failed ({type(e).__name__}). Check ZSCALER_CLIENT_ID, ZSCALER_CLIENT_SECRET, and ZSCALER_VANITY_DOMAIN.")
+        console.print(f"  [bold red][ERROR][/] Authentication failed ({type(e).__name__}). Check ZSCALER_CLIENT_ID, ZSCALER_CLIENT_SECRET, and ZSCALER_VANITY_DOMAIN.")
         sys.exit(1)
 
     zs = ZscalerClient(auth)
@@ -201,12 +268,12 @@ def main():
         print_menu()
         choice = prompt("Choice: ")
         if choice is None:
-            print("  Bye.\n")
+            console.print("  Bye.\n")
             break
         choice = choice.lower()
 
         if choice == "q":
-            print("  Bye.\n")
+            console.print("  Bye.\n")
             break
 
         if choice == "c":
@@ -214,7 +281,7 @@ def main():
             continue
 
         if choice not in MENU:
-            print("  Invalid choice.")
+            console.print("  [bold red][ERROR][/] Invalid choice.")
             continue
 
         item = MENU[choice]
@@ -222,17 +289,16 @@ def main():
         fetcher_name = item["fetcher"]
         question = item["question"]
 
-        print(f"\n  Fetching {label} data from Zscaler...", end="", flush=True)
         try:
-            data = getattr(zs, fetcher_name)()
-            count = len(data) if isinstance(data, list) else "N/A"
-            print(f" {count} records")
+            with console.status(f"Fetching [cyan]{label}[/] data from Zscaler..."):
+                data = getattr(zs, fetcher_name)()
+            count = len(data) if isinstance(data, list) else f"{sum(len(v) for v in data.values() if isinstance(v, list))} records" if isinstance(data, dict) else "N/A"
+            console.print(f"  [green]✓[/] {count} records fetched")
         except Exception as e:
-            print(f"\n  [ERROR] Zscaler API call failed ({type(e).__name__}). Check your permissions and network.")
+            console.print(f"  [bold red][ERROR][/] Zscaler API call failed ({type(e).__name__}). Check your permissions and network.")
             continue
 
-        print(f"\n  Analyzing with Claude...\n")
-        print("─" * 60)
+        console.print(Rule(title="Claude Analysis", style="cyan"))
         analysis = analyst.analyze(data, question)
         save_report(label, data, analysis)
 

@@ -34,11 +34,13 @@ logs/                 — JSON reports saved after each analysis (timestamp_labe
 
 ## Key Design Points
 
-- `ZscalerAuth.token` is a lazy property — it fetches/refreshes automatically on access, no manual token management needed.
-- `ZscalerClient` only implements ZIA endpoints in the interactive menu; ZPA/ZDX methods exist on the class but are not wired to menu items yet.
+- `ZscalerAuth.token` is a lazy property — it fetches/refreshes automatically on access, no manual token management needed. Token URL uses `ZSCALER_VANITY_DOMAIN`, not `ZSCALER_CLOUD`.
+- `ZscalerClient` only implements ZIA endpoints in the interactive menu; ZPA/ZDX methods exist on the class but are not wired to menu items yet. ZPA methods require a `customer_id` parameter that has no UI to collect it.
+- The custom question flow (`[c]` in menu) exposes `get_blocked_destinations` as an extra data source not available in the numbered menu.
 - `ZscalerAnalyst` streams by default (`stream=True`). Pass `stream=False` for non-interactive use.
-- The model is hardcoded to `claude-sonnet-4-6` in [src/analyst.py](src/analyst.py).
+- The model is hardcoded to `claude-opus-4-6` in [src/analyst.py](src/analyst.py).
 - Large payloads (>50k estimated tokens) trigger a warning but are still sent.
+- `prompt()` in `main.py` is an EOF-safe wrapper around `input()` — it returns `None` instead of raising on piped/non-interactive use. All user input goes through it.
 
 ## Credentials
 

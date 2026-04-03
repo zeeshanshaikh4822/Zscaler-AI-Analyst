@@ -46,6 +46,13 @@ class ZscalerClient:
         """DLP dictionaries in use."""
         return self._get(f"{self._zia}/dlp/dictionaries")
 
+    def get_ssl_inspection_full(self) -> dict:
+        """SSL inspection rules + all URL categories for cross-reference analysis."""
+        return {
+            "ssl_inspection_rules": self._get(f"{self._zia}/sslInspectionRules"),
+            "url_categories": self._get(f"{self._zia}/urlCategories"),
+        }
+
     # ── ZPA ──────────────────────────────────────────────────────────────────
 
     def get_zpa_applications(self, customer_id: str) -> list:
