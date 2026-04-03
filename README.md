@@ -51,21 +51,6 @@ Select an analysis:
 | 7 | **SSL Inspection Security Report** | Per-rule audit vs. Zscaler best practices — action names translated, per-rule Block SNI / OCSP / Block Undecryptable Traffic checks, criticality-rated table with exact admin fix steps |
 | c | **Custom Question** | Choose any data source, ask your own question |
 
-### SSL Inspection Security Report (Option 7)
-
-The most detailed analysis. Produces two tables:
-
-**Rules table** — one row per rule:
-
-| Rule Name | Criticality | Current Config | Suggested Fix |
-|-----------|-------------|----------------|---------------|
-| Inspect All | HIGH | Inspect — All traffic (🟢 Enabled) \| SNI 🔴 \| OCSP 🔴 \| Undecryptable 🔴 | Enable Block SNI — traffic without SNI can bypass URL-based policies and hide C2 communications |
-| Bypass Financial | ✅ OK | Do Not Inspect — Financial (🟢 Enabled) | No action needed |
-
-**Global settings table** — tenant-wide SSL security settings with 🟢/🔴 status and bolded remediation if disabled.
-
----
-
 ## Zscaler API Setup
 
 This tool uses Zscaler's OneAPI OAuth2 (`client_credentials` flow). To keep your tenant safe, create a **dedicated read-only API client** before running anything.
